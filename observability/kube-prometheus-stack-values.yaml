@@ -1,0 +1,20 @@
+grafana:
+  defaultDashboardsEnabled: true
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    additionalScrapeConfigs:
+      - job_name: ticketflow
+        metrics_path: /actuator/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: ticketflow
+          - source_labels: [__meta_kubernetes_namespace]
+            action: keep
+            regex: ticketflow
+          - source_labels: [__meta_kubernetes_pod_ip]
+            target_label: __address__
+            replacement: $1:8080

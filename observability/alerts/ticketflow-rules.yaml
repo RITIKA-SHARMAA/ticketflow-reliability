@@ -1,0 +1,179 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ticketflow-slo
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: ticketflow.availability.recording
+      interval: 30s
+      rules:
+        - record: ticketflow:booking_requests:rate5m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[5m]))
+        - record: ticketflow:booking_bad_events:ratio5m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[5m])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio30m
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[30m]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[30m])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio1h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[1h]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[1h])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio2h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[2h]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[2h])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio6h
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[6h]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[6h])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio1d
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[1d]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[1d])), 1e-9)
+        - record: ticketflow:booking_bad_events:ratio3d
+          expr: |
+            sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*",status=~"5.."}[3d]))
+            /
+            clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[3d])), 1e-9)
+
+    - name: ticketflow.latency.recording
+      interval: 30s
+      rules:
+        - record: ticketflow:booking_slow_events:ratio5m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{uri=~".*/bookings.*",uri!~"/actuator.*",le="0.8"}[5m]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[5m])), 1e-9)
+            )
+        - record: ticketflow:booking_slow_events:ratio30m
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{uri=~".*/bookings.*",uri!~"/actuator.*",le="0.8"}[30m]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[30m])), 1e-9)
+            )
+        - record: ticketflow:booking_slow_events:ratio1h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{uri=~".*/bookings.*",uri!~"/actuator.*",le="0.8"}[1h]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[1h])), 1e-9)
+            )
+        - record: ticketflow:booking_slow_events:ratio2h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{uri=~".*/bookings.*",uri!~"/actuator.*",le="0.8"}[2h]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[2h])), 1e-9)
+            )
+        - record: ticketflow:booking_slow_events:ratio6h
+          expr: |
+            1 - (
+              sum(rate(http_server_requests_seconds_bucket{uri=~".*/bookings.*",uri!~"/actuator.*",le="0.8"}[6h]))
+              /
+              clamp_min(sum(rate(http_server_requests_seconds_count{uri=~".*/bookings.*",uri!~"/actuator.*"}[6h])), 1e-9)
+            )
+
+    - name: ticketflow.availability.alerts
+      interval: 30s
+      rules:
+        - alert: TicketFlowAvailabilityFastBurn
+          expr: |
+            (ticketflow:booking_bad_events:ratio1h > 0.144)
+            and
+            (ticketflow:booking_bad_events:ratio5m > 0.144)
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: TicketFlow booking availability is burning budget at 14.4x
+            description: Both 1h and 5m booking error ratios exceed 14.4% (14.4x burn for a 99% objective).
+        - alert: TicketFlowAvailabilitySixXBurn
+          expr: |
+            (ticketflow:booking_bad_events:ratio6h > 0.06)
+            and
+            (ticketflow:booking_bad_events:ratio30m > 0.06)
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: TicketFlow booking availability is burning budget at 6x
+        - alert: TicketFlowAvailabilityThreeXBurn
+          expr: |
+            (ticketflow:booking_bad_events:ratio1d > 0.03)
+            and
+            (ticketflow:booking_bad_events:ratio2h > 0.03)
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: TicketFlow booking availability is burning budget at 3x
+        - alert: TicketFlowAvailabilityOneXBurn
+          expr: |
+            (ticketflow:booking_bad_events:ratio3d > 0.01)
+            and
+            (ticketflow:booking_bad_events:ratio6h > 0.01)
+          for: 30m
+          labels:
+            severity: ticket
+          annotations:
+            summary: TicketFlow booking availability is burning budget at 1x
+
+    - name: ticketflow.latency.alerts
+      interval: 30s
+      rules:
+        - alert: TicketFlowLatencyFastBurn
+          expr: |
+            (ticketflow:booking_slow_events:ratio1h > 0.72)
+            and
+            (ticketflow:booking_slow_events:ratio5m > 0.72)
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: TicketFlow booking latency is burning its 800ms budget at 14.4x
+        - alert: TicketFlowLatencySixXBurn
+          expr: |
+            (ticketflow:booking_slow_events:ratio6h > 0.30)
+            and
+            (ticketflow:booking_slow_events:ratio30m > 0.30)
+          for: 5m
+          labels:
+            severity: page
+          annotations:
+            summary: TicketFlow booking latency is burning its 800ms budget at 6x
+
+    - name: ticketflow.measurement.alerts
+      interval: 30s
+      rules:
+        - alert: TicketFlowSLIMetricsMissing
+          expr: absent(ticketflow:booking_requests:rate5m)
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: TicketFlow booking request metrics are missing
+            description: Check target discovery, scrape health, route labels, and whether booking traffic has occurred.
+        - alert: TicketFlowLatencyBucketMissing
+          expr: |
+            absent(http_server_requests_seconds_bucket{uri=~".*/bookings.*",le="0.8"})
+          for: 10m
+          labels:
+            severity: ticket
+          annotations:
+            summary: TicketFlow 800ms latency histogram bucket is missing
+            description: Confirm Spring histogram and SLO bucket configuration.

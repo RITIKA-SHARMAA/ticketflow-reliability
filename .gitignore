@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+target/
+.DS_Store
+*.log
+load/results/
